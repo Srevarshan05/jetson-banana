@@ -11,14 +11,14 @@ def load_and_preprocess_audio(file_path, sr=16000, duration=5, n_mels=128, targe
     return np.repeat(mel_spec_db, 3, axis=-1)
 
 # Load and configure the TFLite model
-interpreter = tf.lite.Interpreter(model_path='/home/admin/Desktop/banana/weevil_classifier_full_precision.tflite')  # Adjust path
+interpreter = tf.lite.Interpreter(model_path='/home/sre/Desktop/Banana/jetson-banana/weevil_classifier_full_precision.tflite')  # Adjust path
 interpreter.allocate_tensors()
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
 classes = ['stage_1', 'stage_2', 'stage_3', 'stage_4', 'stage_5', 'no_larvae']
 
 # Load and preprocess the test file
-audio_path = '/home/admin/Downloads/Stage 1 (mp3cut.net) (1).wav'  # Adjust path to your test file
+audio_path = '/home/sre/Desktop/Banana/jetson-banana/test data/stage3 (mp3cut.net) (1).wav'  # Adjust path to your test file
 input_data = load_and_preprocess_audio(audio_path)[np.newaxis, ...]
 
 # Run inference

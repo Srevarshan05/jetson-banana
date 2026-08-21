@@ -4,3 +4,6 @@ ban/
 # Model files
 *.tflite
 *.h5
+# Additional virtual environment
+weevil_env/
+weevil_env/

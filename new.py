@@ -2,51 +2,79 @@ import numpy as np
 import librosa
 import sounddevice as sd
 import soundfile as sf
-import os
-from datetime import datetime
-import cv2  # for resizing
-import tflite_runtime.interpreter as tflite
+import cv2
+import tensorflow as tf
 
-def load_and_preprocess_audio(file_path, sr=16000, duration=5, n_mels=128, target_shape=(224, 224)):
-    audio, _ = librosa.load(file_path, sr=sr, duration=duration)
-    mel_spec = librosa.feature.melspectrogram(y=audio, sr=sr, n_mels=n_mels, fmax=2000)
-    mel_spec_db = librosa.power_to_db(mel_spec, ref=np.max)
+# ================= CONFIG =================
+MODEL_PATH = "/home/sre/Desktop/Banana/jetson-banana/weevil_classifier_keras.h5"
+TEMP_AUDIO = "temp_recording.wav"
+CLASSES = ['stage_1','stage_2','stage_3','stage_4','stage_5','no_larvae']
+RECORD_DURATION = 10
+SAMPLE_RATE = 44100
+# ==========================================
 
-    # Replace tf.image.resize with cv2.resize
-    mel_spec_db = cv2.resize(mel_spec_db, target_shape)
-    mel_spec_db = mel_spec_db[..., np.newaxis]
 
-    mel_spec_db = (mel_spec_db - mel_spec_db.min()) / (mel_spec_db.max() - mel_spec_db.min())
-    return np.repeat(mel_spec_db, 3, axis=-1).astype(np.float32)
+# ---------- Load Model ----------
+print("🔄 Loading H5 model...")
+model = tf.keras.models.load_model(MODEL_PATH)
+print("✅ Model Loaded")
 
-# === Step 1: Record audio from USB mic (30 seconds)
-record_duration = 30
-fs = 44100
-channels = 1
-device_index = 3
-temp_file = "/tmp/temp_recording.wav"
 
-print("🎙️ Recording from mic for 30 seconds...")
-recording = sd.rec(int(record_duration * fs), samplerate=fs, channels=channels, dtype='int16', device=device_index)
-sd.wait()
-sf.write(temp_file, recording, fs)
-print("✅ Recording complete.")
+# ---------- Record Audio ----------
+def record_audio():
+    print(f"🎙 Recording for {RECORD_DURATION} seconds...")
+    recording = sd.rec(
+        int(RECORD_DURATION * SAMPLE_RATE),
+        samplerate=SAMPLE_RATE,
+        channels=1,
+        dtype='int16'
+    )
+    sd.wait()
+    sf.write(TEMP_AUDIO, recording, SAMPLE_RATE)
+    print("✅ Recording Saved")
 
-# === Step 2: Load and configure the TFLite model
-interpreter = tflite.Interpreter(model_path='/home/admin/Desktop/banana/jetson-banana/weevil_classifier_full_precision.tflite')
-interpreter.allocate_tensors()
-input_details = interpreter.get_input_details()
-output_details = interpreter.get_output_details()
 
-classes = ['stage_1', 'stage_2', 'stage_3', 'stage_4', 'stage_5', 'no_larvae']
+# ---------- Preprocess ----------
+def preprocess_audio(file_path):
+    audio, _ = librosa.load(file_path, sr=16000)
 
-# === Step 3: Load and preprocess
-input_data = load_and_preprocess_audio(temp_file)[np.newaxis, ...]
+    mel_spec = librosa.feature.melspectrogram(
+        y=audio,
+        sr=16000,
+        n_mels=128,
+        fmax=2000
+    )
 
-# === Step 4: Run inference
-interpreter.set_tensor(input_details[0]['index'], input_data)
-interpreter.invoke()
-prediction = interpreter.get_tensor(output_details[0]['index'])
+    mel_db = librosa.power_to_db(mel_spec, ref=np.max)
 
-predicted_class = classes[np.argmax(prediction)]
-print(f"🪱 Predicted class (TFLite): {predicted_class}")
+    mel_resized = cv2.resize(mel_db, (224, 224))
+    mel_resized = mel_resized[..., np.newaxis]
+
+    mel_resized = (mel_resized - mel_resized.min()) / (
+        mel_resized.max() - mel_resized.min()
+    )
+
+    mel_resized = np.repeat(mel_resized, 3, axis=-1)
+
+    return mel_resized[np.newaxis, ...].astype(np.float32)
+
+
+# ---------- Run Inference ----------
+def run_inference():
+    input_data = preprocess_audio(TEMP_AUDIO)
+
+    prediction = model.predict(input_data, verbose=0)[0]
+
+    predicted_index = np.argmax(prediction)
+    confidence = float(prediction[predicted_index])
+
+    print("\n🪱 ===== Inference Result =====")
+    print(f"Predicted Stage : {CLASSES[predicted_index]}")
+    print(f"Confidence      : {confidence:.4f}")
+    print("==============================\n")
+
+
+# ---------- Main ----------
+if __name__ == "__main__":
+    record_audio()
+    run_inference()

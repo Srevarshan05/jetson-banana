@@ -27,7 +27,11 @@ sd.wait()
 sf.write(temp_file, recording, fs)
 print("✅ Recording complete.")
 
-# === Step 2: Load and configure the TFLite model
+# === Step 2: Load an
+ChatGPT can make mistakes. Check important info.
+￼
+￼
+d configure the TFLite model
 interpreter = tf.lite.Interpreter(model_path='/home/admin/Desktop/banana/weevil_classifier_full_precision.tflite')
 interpreter.allocate_tensors()
 input_details = interpreter.get_input_details()
