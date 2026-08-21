@@ -1,0 +1,6 @@
+# Virtual environment
+ban/
+
+# Model files
+*.tflite
+*.h5
